@@ -266,7 +266,7 @@ function renderList() {
     const d = parseDay(e.date);
     return `<button class="ev ${e.date === today ? "today" : ""}" data-ev="${esc(e.id)}">
       <div class="d"><b>${d.getDate()}</b><span>${d.toLocaleDateString("de-CH", { month: "short" })} ${String(d.getFullYear()).slice(2)}</span></div>
-      <div class="t"><b>${esc(e.name)}${e.backfilled ? `<span class="tag">nachgetragen</span>` : ""}</b><span>${fmtDate(e.date, { weekday: "long" })} · ${(e.articles || []).filter(a => !a.hidden).length} Artikel · ${evTotal(e)} verkauft</span></div>
+      <div class="t"><b>${esc(e.name)}${e.backfilled ? `<span class="tag">nachgetragen${e.backfillMode === "hours" ? " · stündlich" : ""}</span>` : ""}</b><span>${fmtDate(e.date, { weekday: "long" })} · ${(e.articles || []).filter(a => !a.hidden).length} Artikel · ${evTotal(e)} verkauft</span></div>
       <span style="color:var(--mut)">›</span></button>`;
   };
   h(`<header><div class="top">
@@ -299,7 +299,7 @@ function suggestionFor(name, date) {
   return prev || null;
 }
 function renderNew() {
-  if (!S.draft) S.draft = { name: "", date: dayKey(new Date()), items: [], fromId: null, backfill: false };
+  if (!S.draft) S.draft = { name: "", date: dayKey(new Date()), items: [], fromId: null, backfill: false, mode: "total", hFrom: 7, hTo: 18 };
   const D = S.draft;
   const names = [...new Map(S.events.map(e => [e.nameKey, e.name])).values()].sort((a, b) => a.localeCompare(b));
   h(`<header><div class="top"><button class="icon" id="bback">‹</button><h1>Neues Event</h1></div></header>
@@ -314,6 +314,7 @@ function renderNew() {
       <div class="sec">Artikel</div>
       <div class="list" id="nitems"></div>
       <form class="add" id="nadd"><input type="text" id="naddn" placeholder="Artikel hinzufügen" autocomplete="off"><button class="ghost">＋</button></form>
+      <div id="nhours"></div>
       <div class="err" id="nerr"></div>
       <button class="primary wide" id="nsave" style="margin-top:16px">Event anlegen</button>
     </main>`);
@@ -322,15 +323,44 @@ function renderNew() {
     box.innerHTML = D.items.length ? D.items.map((it, i) => `<div class="item">
         <input type="checkbox" data-i="${i}" ${it.on ? "checked" : ""}>
         <span class="nm">${esc(it.name)}</span>
-        ${D.backfill ? `<input class="qty" type="number" inputmode="numeric" min="0" step="1" placeholder="Anzahl" data-q="${i}" value="${it.qty ?? ""}">` : ""}
+        ${D.backfill && D.mode === "total" ? `<input class="qty" type="number" inputmode="numeric" min="0" step="1" placeholder="Anzahl" data-q="${i}" value="${it.qty ?? ""}">` : ""}
         <button data-del="${i}" title="Entfernen">✕</button></div>`).join("")
       : `<div class="note">Noch keine Artikel. Unten hinzufügen.</div>`;
-    box.querySelectorAll("[data-i]").forEach(c => c.onchange = () => { D.items[+c.dataset.i].on = c.checked; });
+    box.querySelectorAll("[data-i]").forEach(c => c.onchange = () => { D.items[+c.dataset.i].on = c.checked; drawGrid(); });
     box.querySelectorAll("[data-q]").forEach(q => q.oninput = () => {
       const it = D.items[+q.dataset.q]; it.qty = q.value === "" ? "" : Math.max(0, Math.floor(+q.value) || 0);
       if (it.qty !== "" && it.qty > 0) { it.on = true; const c = box.querySelector(`[data-i="${q.dataset.q}"]`); if (c) c.checked = true; }
     });
     box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { D.items.splice(+b.dataset.del, 1); drawItems(); });
+    drawGrid();
+  };
+  // Raster Stunde × Artikel für das stundengenaue Nachtragen
+  const drawGrid = () => {
+    const el = document.getElementById("nhours"); if (!el) return;
+    if (!(D.backfill && D.mode === "hours")) { el.innerHTML = ""; return; }
+    const its = D.items.map((it, i) => ({ it, i })).filter(x => x.it.on);
+    const hours = []; for (let x = D.hFrom; x <= D.hTo; x++) hours.push(x);
+    const opt = (sel, from, to) => { let o = ""; for (let x = from; x <= to; x++) o += `<option value="${x}" ${x === sel ? "selected" : ""}>${pad2(x)}:00</option>`; return o; };
+    const colSum = it => hours.reduce((s, x) => s + (+((it.hq || {})[x]) || 0), 0);
+    el.innerHTML = `<div class="sec">Verkäufe pro Stunde</div>
+      <div class="bar" style="justify-content:flex-start">
+        <span class="total">von</span><select id="hfrom" style="width:auto">${opt(D.hFrom, 0, 23)}</select>
+        <span class="total">bis</span><select id="hto" style="width:auto">${opt(D.hTo, 0, 23)}</select>
+      </div>
+      ${!its.length ? `<div class="note">Zuerst Artikel auswählen.</div>` : `<div class="scroll"><table>
+        <thead><tr><th>Stunde</th>${its.map(x => `<th>${esc(x.it.name)}</th>`).join("")}</tr></thead>
+        <tbody>${hours.map(x => `<tr><td>${pad2(x)}–${pad2(x + 1)}</td>${its.map(({ it, i }) =>
+          `<td><input class="qty" style="width:64px;padding:6px 8px" type="number" inputmode="numeric" min="0" step="1" data-gi="${i}" data-gh="${x}" value="${(it.hq || {})[x] ?? ""}"></td>`).join("")}</tr>`).join("")}
+        <tr class="sum"><td>Total</td>${its.map(({ it, i }) => `<td data-gs="${i}">${colSum(it)}</td>`).join("")}</tr></tbody></table></div>`}
+      <p class="note">Leere Felder zählen als 0.</p>`;
+    el.querySelector("#hfrom").onchange = e => { D.hFrom = +e.target.value; if (D.hTo < D.hFrom) D.hTo = D.hFrom; drawGrid(); };
+    el.querySelector("#hto").onchange = e => { D.hTo = +e.target.value; if (D.hFrom > D.hTo) D.hFrom = D.hTo; drawGrid(); };
+    el.querySelectorAll("[data-gi]").forEach(inp => inp.oninput = () => {
+      const it = D.items[+inp.dataset.gi]; it.hq = it.hq || {};
+      const v = inp.value === "" ? "" : Math.max(0, Math.floor(+inp.value) || 0);
+      if (v === "") delete it.hq[inp.dataset.gh]; else it.hq[inp.dataset.gh] = v;
+      const c = el.querySelector(`[data-gs="${inp.dataset.gi}"]`); if (c) c.textContent = colSum(it);
+    });
   };
   const drawSug = () => {
     const prev = suggestionFor(D.name, D.date);
@@ -353,9 +383,14 @@ function renderNew() {
     const el = document.getElementById("nback");
     const past = D.date < dayKey(new Date());
     if (!past) { D.backfill = false; el.innerHTML = ""; return; }
-    el.innerHTML = `<label class="switch"><input type="checkbox" id="nbf" ${D.backfill ? "checked" : ""}> Vergangenes Event nachtragen (Totals eingeben)</label>
-      ${D.backfill ? `<div class="note">Pro Artikel die verkaufte Gesamtmenge eingeben. Nachgetragene Events haben keine Stundenauswertung und können danach nicht mehr gezählt werden.</div>` : ""}`;
+    el.innerHTML = `<label class="switch"><input type="checkbox" id="nbf" ${D.backfill ? "checked" : ""}> Vergangenes Event nachtragen</label>
+      ${D.backfill ? `<div class="bar" style="margin-top:10px;margin-bottom:0">
+          <button class="${D.mode === "total" ? "primary" : "ghost"}" data-mode="total" style="flex:1">Tagestotal</button>
+          <button class="${D.mode === "hours" ? "primary" : "ghost"}" data-mode="hours" style="flex:1">Pro Stunde</button>
+        </div>
+        <div class="note">${D.mode === "total" ? "Pro Artikel die verkaufte Gesamtmenge eingeben. Ohne Stundenauswertung." : "Unten im Raster pro Stunde und Artikel die Verkäufe eingeben."} Nachgetragene Events können danach nicht mehr gezählt werden.</div>` : ""}`;
     document.getElementById("nbf").onchange = e => { D.backfill = e.target.checked; drawBack(); drawItems(); updSave(); };
+    el.querySelectorAll("[data-mode]").forEach(b => b.onclick = () => { D.mode = b.dataset.mode; drawBack(); drawItems(); });
   };
   const updSave = () => { document.getElementById("nsave").textContent = D.backfill ? "Event nachtragen" : "Event anlegen"; };
   const nn = document.getElementById("nname");
@@ -385,16 +420,23 @@ function renderNew() {
     const chosen = D.items.filter(i => i.on);
     const articles = chosen.map(i => ({ id: newId(), name: i.name.trim() }));
     const counts = {};
-    if (D.backfill) {
+    if (D.backfill && D.mode === "total") {
       if (!chosen.some(i => +i.qty > 0)) { err.textContent = "Bitte mindestens bei einem Artikel eine Anzahl eingeben."; return; }
       chosen.forEach((i, k) => { if (+i.qty > 0) counts[articles[k].id] = { tot: +i.qty }; });
+    } else if (D.backfill) {
+      chosen.forEach((i, k) => {
+        const hc = {};
+        for (const x in (i.hq || {})) if (+x >= D.hFrom && +x <= D.hTo && +i.hq[x] > 0) hc[hourKey(+x)] = +i.hq[x];
+        if (Object.keys(hc).length) counts[articles[k].id] = hc;
+      });
+      if (!Object.keys(counts).length) { err.textContent = "Bitte im Raster mindestens eine Anzahl eingeben."; return; }
     }
     const btn = document.getElementById("nsave"); btn.disabled = true;
     try {
       const data = { name, nameKey: nameKey(name), date: D.date, year: +D.date.slice(0, 4), articles, counts, createdAt: serverTimestamp() };
-      if (D.backfill) data.backfilled = true;
+      if (D.backfill) { data.backfilled = true; data.backfillMode = D.mode; }
       const ref = await addDoc(collection(db, "events"), data);
-      S.draft = null; go("event", { evId: ref.id, evTab: D.backfill ? "sum" : articles.length ? "count" : "items" });
+      S.draft = null; go("event", { evId: ref.id, evTab: D.backfill ? (D.mode === "hours" ? "hours" : "sum") : articles.length ? "count" : "items" });
     } catch (x) { console.error(x); err.textContent = "Speichern fehlgeschlagen."; btn.disabled = false; }
   };
   drawBack(); drawItems(); drawSug(); updSave();
@@ -404,7 +446,7 @@ function renderNew() {
 function curEvent() { return S.events.find(e => e.id === S.evId); }
 function renderEvent() {
   const ev = curEvent(); if (!ev) return go("list");
-  const tabs = ev.backfilled ? [["sum", "Übersicht"]] : [["count", "Zählen"], ["hours", "Stündlich"], ["items", "Artikel"]];
+  const tabs = ev.backfilled ? (ev.backfillMode === "hours" ? [["hours", "Stündlich"]] : [["sum", "Übersicht"]]) : [["count", "Zählen"], ["hours", "Stündlich"], ["items", "Artikel"]];
   if (!tabs.some(t => t[0] === S.evTab)) S.evTab = tabs[0][0];
   h(`<header><div class="top">
       <button class="icon" id="bback">‹</button>
