@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#7a4b2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Verkaufszähler">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<title>Verkaufszähler</title>
+<style>
+  :root{--bg:#f6f3ee;--card:#fff;--ink:#2b2622;--mut:#8a8178;--acc:#7a4b2a;--acc2:#f1e4d8;--line:#e6dfd6;--ok:#2f7a3b;--bad:#a63b2b;}
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-tap-highlight-color:transparent;padding-bottom:env(safe-area-inset-bottom)}
+  header{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 14px 0}
+  .top{display:flex;align-items:center;gap:10px;min-height:40px}
+  .top h1{font-size:18px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .top .sub{font-size:12px;color:var(--mut);font-weight:400;display:block}
+  .icon{border:0;background:none;font-size:22px;padding:6px 8px;cursor:pointer;color:var(--ink);line-height:1}
+  nav{display:flex;gap:2px;margin-top:6px}
+  nav button{flex:1;border:0;background:none;padding:10px 4px;font:inherit;font-size:15px;color:var(--mut);border-bottom:3px solid transparent;cursor:pointer}
+  nav button.on{color:var(--ink);border-bottom-color:var(--acc);font-weight:600}
+  main{padding:14px;max-width:900px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+  .btn{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 12px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;cursor:pointer;user-select:none;transition:transform .06s,background .15s;font:inherit;color:inherit}
+  .btn:active{transform:scale(.97)}
+  .btn.flash{background:var(--acc2)}
+  .btn .n{font-size:16px;font-weight:600;line-height:1.2;word-break:break-word}
+  .btn .row{display:flex;justify-content:space-between;align-items:flex-end}
+  .btn .c{font-size:30px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
+  .btn .plus{font-size:26px;color:var(--mut)}
+  .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+  .ghost{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
+  .ghost:disabled{opacity:.4;cursor:default}
+  .primary{background:var(--acc);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-size:15px;cursor:pointer}
+  .primary:disabled{opacity:.5}
+  .danger{background:var(--bad);color:#fff;border:0;border-radius:10px;padding:12px 16px;font:inherit;font-size:15px;cursor:pointer}
+  .wide{width:100%}
+  .total{font-size:14px;color:var(--mut)}
+  .total b{color:var(--ink);font-size:18px}
+  label{display:block;font-size:13px;color:var(--mut);margin:12px 0 4px}
+  input[type=text],input[type=email],input[type=password],input[type=date],input[type=tel],select{width:100%;border:1px solid var(--line);border-radius:10px;padding:11px 12px;font:inherit;font-size:16px;background:#fff;color:var(--ink)}
+  table{width:100%;border-collapse:collapse;background:var(--card);font-variant-numeric:tabular-nums}
+  th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;font-size:14px;white-space:nowrap}
+  th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--card);white-space:normal;min-width:110px}
+  thead th,thead th:first-child{background:#efe8df;font-weight:600}
+  tr.sum td{font-weight:700;background:#faf7f3}
+  td.z{color:#cfc6bc}
+  .up{color:var(--ok)} .down{color:var(--bad)}
+  .scroll{overflow-x:auto;border-radius:12px;border:1px solid var(--line)}
+  .chart{display:flex;align-items:flex-end;gap:4px;height:140px;padding:10px 6px 0;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-bottom:12px}
+  .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+  .col .b{width:100%;max-width:34px;background:var(--acc);border-radius:4px 4px 0 0;min-height:1px}
+  .col .v{font-size:11px;margin-bottom:2px}
+  .col .h{font-size:10px;color:var(--mut);padding:4px 0 6px}
+  .list{display:flex;flex-direction:column;gap:8px}
+  .ev{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%}
+  .ev .d{width:52px;text-align:center;flex:none;border-right:1px solid var(--line);padding-right:10px}
+  .ev .d b{display:block;font-size:20px}
+  .ev .d span{font-size:11px;color:var(--mut);text-transform:uppercase}
+  .ev .t{flex:1;min-width:0}
+  .ev .t b{display:block;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ev .t span{font-size:13px;color:var(--mut)}
+  .ev.today{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc) inset}
+  .sec{font-size:13px;color:var(--mut);margin:18px 2px 8px;text-transform:uppercase;letter-spacing:.04em}
+  .item{display:flex;gap:6px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 10px}
+  .item input[type=text]{flex:1;border:0;padding:8px 0;min-width:0}
+  .item input[type=checkbox]{width:22px;height:22px;accent-color:var(--acc);flex:none}
+  .item .nm{flex:1;padding:8px 0}
+  .item button{border:0;background:none;font-size:18px;cursor:pointer;color:var(--mut);padding:6px 8px}
+  .item button:disabled{opacity:.3}
+  .add{display:flex;gap:8px;margin-top:10px}
+  .add input{flex:1;min-width:0}
+  .empty{color:var(--mut);text-align:center;padding:30px 10px;line-height:1.5}
+  .note{font-size:12px;color:var(--mut);margin-top:12px;line-height:1.45}
+  .hint{background:var(--acc2);border-radius:10px;padding:10px 12px;font-size:14px;margin-top:12px;line-height:1.4}
+  .err{color:var(--bad);font-size:14px;margin-top:10px;min-height:1em}
+  .warn{background:#fff3cd;border:1px solid #f0dc9a;color:#6b5500;border-radius:10px;padding:8px 12px;font-size:13px;margin-bottom:12px}
+  .fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;background:var(--acc);color:#fff;border:0;font-size:30px;box-shadow:0 4px 14px rgba(0,0,0,.2);cursor:pointer}
+  .modal{position:fixed;inset:0;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;z-index:20;padding:20px}
+  .modal .box{background:var(--card);border-radius:14px;padding:18px;max-width:360px;width:100%}
+  .modal .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+  .pin{display:flex;gap:10px;justify-content:center;margin:18px 0}
+  .pin span{width:14px;height:14px;border-radius:50%;border:2px solid var(--acc)}
+  .pin span.f{background:var(--acc)}
+  .pad{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;max-width:280px;margin:0 auto}
+  .pad button{height:60px;border-radius:14px;border:1px solid var(--line);background:var(--card);font:inherit;font-size:22px;cursor:pointer;color:var(--ink)}
+  .login{max-width:360px;margin:8vh auto 0}
+  .login h2{margin:0 0 4px}
+  .offline{background:#555;color:#fff;font-size:12px;text-align:center;padding:4px}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div class="offline" id="offline" hidden>Offline – Zählungen werden gespeichert und später synchronisiert.</div>
+<div id="app"></div>
+
+<script type="module">
+/* =====================================================================
+   FIREBASE-KONFIGURATION
+   In der Firebase-Konsole: Projekteinstellungen → Allgemein → Deine Apps
+   → Web-App → Konfiguration. Werte hier einsetzen.
+   ===================================================================== */
+const firebaseConfig = {
+  apiKey: "AIzaSyDRRm94tBa4m27fQlDZuU5DJ3JlX9eH0NQ",
+  authDomain: "schweizerhof-events.firebaseapp.com",
+  projectId: "schweizerhof-events",
+  storageBucket: "schweizerhof-events.firebasestorage.app",
+  messagingSenderId: "627278579445",
+  appId: "1:627278579445:web:61618565949a49099467bc"
+};
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut, setPersistence, browserLocalPersistence }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, getDoc, setDoc,
+  increment, FieldPath, serverTimestamp, deleteField }
+  from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const fbApp = initializeApp(firebaseConfig);
+const auth = getAuth(fbApp);
+const db = initializeFirestore(fbApp, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) });
+
+/* ---------------- Hilfsfunktionen ---------------- */
+const $app = document.getElementById("app");
+const pad2 = n => String(n).padStart(2, "0");
+const dayKey = d => d.getFullYear() + "-" + pad2(d.getMonth() + 1) + "-" + pad2(d.getDate());
+const parseDay = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const nameKey = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+const newId = () => "a" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const hourKey = h => "h" + pad2(h);
+const fmtDate = (k, opts) => parseDay(k).toLocaleDateString("de-CH", opts || { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" });
+const artTotal = (ev, id) => Object.values((ev.counts || {})[id] || {}).reduce((a, b) => a + (b || 0), 0);
+const evTotal = ev => Object.keys(ev.counts || {}).reduce((s, id) => s + artTotal(ev, id), 0);
+async function sha256(t) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+function h(html) { $app.innerHTML = html; }
+function modal(html) {
+  const m = document.createElement("div"); m.className = "modal";
+  m.innerHTML = `<div class="box">${html}</div>`;
+  document.body.appendChild(m);
+  m.addEventListener("click", e => { if (e.target === m) m.remove(); });
+  return m;
+}
+function confirmBox(text, okLabel, danger) {
+  return new Promise(res => {
+    const m = modal(`<div>${text}</div><div class="acts"><button class="ghost" data-no>Abbrechen</button><button class="${danger ? "danger" : "primary"}" data-yes>${esc(okLabel)}</button></div>`);
+    m.querySelector("[data-no]").onclick = () => { m.remove(); res(false); };
+    m.querySelector("[data-yes]").onclick = () => { m.remove(); res(true); };
+  });
+}
+
+/* ---------------- Zustand ---------------- */
+const S = {
+  user: null,
+  events: [],          // alle Events (live)
+  loaded: false,
+  view: "list",        // list | new | event | stats
+  evId: null,
+  evTab: "count",      // count | hours | items
+  undo: [],            // [{evId, artId, hk}]
+  statsUnlocked: 0,    // Zeitstempel
+  statsName: null,
+  pinHash: null,
+};
+let unsubEvents = null, unsubSettings = null;
+
+window.addEventListener("online", () => document.getElementById("offline").hidden = true);
+window.addEventListener("offline", () => document.getElementById("offline").hidden = false);
+document.getElementById("offline").hidden = navigator.onLine;
+
+/* ---------------- Auth ---------------- */
+setPersistence(auth, browserLocalPersistence).catch(() => {});
+onAuthStateChanged(auth, u => {
+  S.user = u;
+  if (unsubEvents) { unsubEvents(); unsubEvents = null; }
+  if (unsubSettings) { unsubSettings(); unsubSettings = null; }
+  if (!u) { S.events = []; S.loaded = false; renderLogin(); return; }
+  S.view = "list"; render();
+  unsubEvents = onSnapshot(query(collection(db, "events"), orderBy("date", "desc")), snap => {
+    S.events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    S.loaded = true;
+    if (S.view === "event" && !S.events.find(e => e.id === S.evId)) S.view = "list";
+    render(true);
+  }, err => { console.error(err); S.loaded = true; S.loadError = err.code || String(err); render(); });
+  unsubSettings = onSnapshot(doc(db, "settings", "app"), s => { S.pinHash = s.exists() ? s.data().pinHash || null : null; }, () => {});
+});
+
+function renderLogin() {
+  h(`<main><div class="login card">
+    <h2>Verkaufszähler</h2>
+    <div class="total">Bitte anmelden</div>
+    <form id="lf">
+      <label>E-Mail</label><input type="email" id="le" autocomplete="username" required>
+      <label>Passwort</label><input type="password" id="lp" autocomplete="current-password" required>
+      <div class="err" id="lerr"></div>
+      <button class="primary wide" style="margin-top:8px">Anmelden</button>
+    </form>
+  </div></main>`);
+  document.getElementById("lf").onsubmit = async e => {
+    e.preventDefault();
+    const err = document.getElementById("lerr"); err.textContent = "";
+    try { await signInWithEmailAndPassword(auth, document.getElementById("le").value.trim(), document.getElementById("lp").value); }
+    catch (x) { err.textContent = "Anmeldung fehlgeschlagen. E-Mail oder Passwort prüfen."; }
+  };
+}
+
+/* ---------------- Router ---------------- */
+function render(fromSnapshot) {
+  if (!S.user) return renderLogin();
+  // Beim Live-Update nicht in Formulare reinrendern
+  if (fromSnapshot && (S.view === "new" || (S.view === "event" && S.evTab === "items" && document.activeElement && document.activeElement.tagName === "INPUT"))) return;
+  if (S.view === "list") return renderList();
+  if (S.view === "new") return renderNew();
+  if (S.view === "event") return renderEvent();
+  if (S.view === "stats") return renderStats();
+}
+function go(view, extra) { Object.assign(S, { view }, extra || {}); render(); window.scrollTo(0, 0); }
+
+/* ---------------- Event-Liste ---------------- */
+function renderList() {
+  const today = dayKey(new Date());
+  const evs = S.events;
+  const upcoming = evs.filter(e => e.date >= today).sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+  const past = evs.filter(e => e.date < today);
+  const row = e => {
+    const d = parseDay(e.date);
+    return `<button class="ev ${e.date === today ? "today" : ""}" data-ev="${esc(e.id)}">
+      <div class="d"><b>${d.getDate()}</b><span>${d.toLocaleDateString("de-CH", { month: "short" })} ${String(d.getFullYear()).slice(2)}</span></div>
+      <div class="t"><b>${esc(e.name)}</b><span>${fmtDate(e.date, { weekday: "long" })} · ${(e.articles || []).filter(a => !a.hidden).length} Artikel · ${evTotal(e)} verkauft</span></div>
+      <span style="color:var(--mut)">›</span></button>`;
+  };
+  h(`<header><div class="top">
+      <h1>Verkaufszähler</h1>
+      <button class="icon" id="bstats" title="Statistik">📊</button>
+      <button class="icon" id="bout" title="Abmelden">⎋</button>
+    </div></header>
+    <main>
+      ${S.loadError ? `<div class="warn">Daten konnten nicht geladen werden (${esc(S.loadError)}). Firestore-Regeln und Konfiguration prüfen.</div>` : ""}
+      ${!S.loaded ? `<div class="empty">Lade …</div>` :
+        !evs.length ? `<div class="empty">Noch keine Events.<br>Mit <b>＋</b> ein Event anlegen.</div>` : `
+        ${upcoming.length ? `<div class="sec">Heute &amp; kommend</div><div class="list">${upcoming.map(row).join("")}</div>` : ""}
+        ${past.length ? `<div class="sec">Vergangen</div><div class="list">${past.map(row).join("")}</div>` : ""}`}
+      <div style="height:80px"></div>
+    </main>
+    <button class="fab" id="bnew" title="Neues Event">＋</button>`);
+  $app.querySelectorAll("[data-ev]").forEach(b => b.onclick = () => go("event", { evId: b.dataset.ev, evTab: "count" }));
+  document.getElementById("bnew").onclick = () => go("new", { draft: null });
+  document.getElementById("bstats").onclick = () => openStats();
+  document.getElementById("bout").onclick = async () => { if (await confirmBox("Abmelden?", "Abmelden")) signOut(auth); };
+}
+
+/* ---------------- Neues Event ---------------- */
+function suggestionFor(name, date) {
+  const k = nameKey(name); if (!k) return null;
+  const prev = S.events.filter(e => e.nameKey === k && e.date < date).sort((a, b) => b.date.localeCompare(a.date))[0]
+    || S.events.filter(e => e.nameKey === k).sort((a, b) => b.date.localeCompare(a.date))[0];
+  return prev || null;
+}
+function renderNew() {
+  if (!S.draft) S.draft = { name: "", date: dayKey(new Date()), items: [], fromId: null };
+  const D = S.draft;
+  const names = [...new Map(S.events.map(e => [e.nameKey, e.name])).values()].sort((a, b) => a.localeCompare(b));
+  h(`<header><div class="top"><button class="icon" id="bback">‹</button><h1>Neues Event</h1></div></header>
+    <main>
+      <label>Name des Events</label>
+      <input type="text" id="nname" list="names" placeholder="z. B. Zibelemärit" value="${esc(D.name)}" autocomplete="off">
+      <datalist id="names">${names.map(n => `<option value="${esc(n)}">`).join("")}</datalist>
+      <label>Datum</label>
+      <input type="date" id="ndate" value="${esc(D.date)}">
+      <div id="nsug"></div>
+      <div class="sec">Artikel</div>
+      <div class="list" id="nitems"></div>
+      <form class="add" id="nadd"><input type="text" id="naddn" placeholder="Artikel hinzufügen" autocomplete="off"><button class="ghost">＋</button></form>
+      <div class="err" id="nerr"></div>
+      <button class="primary wide" id="nsave" style="margin-top:16px">Event anlegen</button>
+    </main>`);
+  const drawItems = () => {
+    const box = document.getElementById("nitems");
+    box.innerHTML = D.items.length ? D.items.map((it, i) => `<div class="item">
+        <input type="checkbox" data-i="${i}" ${it.on ? "checked" : ""}>
+        <span class="nm">${esc(it.name)}</span>
+        <button data-del="${i}" title="Entfernen">✕</button></div>`).join("")
+      : `<div class="note">Noch keine Artikel. Unten hinzufügen.</div>`;
+    box.querySelectorAll("[data-i]").forEach(c => c.onchange = () => { D.items[+c.dataset.i].on = c.checked; });
+    box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { D.items.splice(+b.dataset.del, 1); drawItems(); });
+  };
+  const drawSug = () => {
+    const prev = suggestionFor(D.name, D.date);
+    const el = document.getElementById("nsug");
+    if (!prev) { el.innerHTML = ""; return; }
+    const arts = (prev.articles || []).filter(a => !a.hidden);
+    if (D.fromId === prev.id) {
+      el.innerHTML = `<div class="hint">Artikel von <b>${esc(prev.name)}</b> (${fmtDate(prev.date)}) als Vorschlag übernommen. Abwählen, was nicht gebraucht wird.</div>`;
+    } else {
+      el.innerHTML = `<div class="hint">„${esc(prev.name)}“ gab es am ${fmtDate(prev.date)} mit ${arts.length} Artikeln.
+        <div style="margin-top:8px"><button class="primary" id="nuse">Artikel übernehmen</button></div></div>`;
+      document.getElementById("nuse").onclick = () => {
+        const have = new Set(D.items.map(i => nameKey(i.name)));
+        arts.forEach(a => { if (!have.has(nameKey(a.name))) D.items.push({ name: a.name, on: true }); });
+        D.fromId = prev.id; drawSug(); drawItems();
+      };
+    }
+  };
+  const nn = document.getElementById("nname");
+  nn.oninput = () => {
+    D.name = nn.value;
+    const prev = suggestionFor(D.name, D.date);
+    // automatisch vorschlagen, solange noch keine eigenen Artikel erfasst sind
+    if (prev && !D.items.length && D.fromId !== prev.id) {
+      (prev.articles || []).filter(a => !a.hidden).forEach(a => D.items.push({ name: a.name, on: true }));
+      D.fromId = prev.id; drawItems();
+    }
+    drawSug();
+  };
+  document.getElementById("ndate").onchange = e => { D.date = e.target.value || dayKey(new Date()); drawSug(); };
+  document.getElementById("nadd").onsubmit = e => {
+    e.preventDefault();
+    const i = document.getElementById("naddn"); const v = i.value.trim(); if (!v) return;
+    if (!D.items.some(x => nameKey(x.name) === nameKey(v))) D.items.push({ name: v, on: true });
+    i.value = ""; drawItems(); i.focus();
+  };
+  document.getElementById("bback").onclick = () => go("list");
+  document.getElementById("nsave").onclick = async () => {
+    const err = document.getElementById("nerr"); err.textContent = "";
+    const name = D.name.trim();
+    if (!name) { err.textContent = "Bitte einen Namen eingeben."; return; }
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(D.date)) { err.textContent = "Bitte ein Datum wählen."; return; }
+    const articles = D.items.filter(i => i.on).map(i => ({ id: newId(), name: i.name.trim() }));
+    const btn = document.getElementById("nsave"); btn.disabled = true;
+    try {
+      const ref = await addDoc(collection(db, "events"), {
+        name, nameKey: nameKey(name), date: D.date, year: +D.date.slice(0, 4),
+        articles, counts: {}, createdAt: serverTimestamp()
+      });
+      S.draft = null; go("event", { evId: ref.id, evTab: articles.length ? "count" : "items" });
+    } catch (x) { console.error(x); err.textContent = "Speichern fehlgeschlagen."; btn.disabled = false; }
+  };
+  drawItems(); drawSug();
+}
+
+/* ---------------- Event: Zählen / Stündlich / Artikel ---------------- */
+function curEvent() { return S.events.find(e => e.id === S.evId); }
+function renderEvent() {
+  const ev = curEvent(); if (!ev) return go("list");
+  const tabs = [["count", "Zählen"], ["hours", "Stündlich"], ["items", "Artikel"]];
+  h(`<header><div class="top">
+      <button class="icon" id="bback">‹</button>
+      <h1>${esc(ev.name)}<span class="sub">${fmtDate(ev.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })}</span></h1>
+      <button class="icon" id="bmore" title="Event bearbeiten">⋯</button>
+    </div>
+    <nav>${tabs.map(([k, l]) => `<button data-tab="${k}" class="${S.evTab === k ? "on" : ""}">${l}</button>`).join("")}</nav></header>
+    <main id="evmain"></main>`);
+  document.getElementById("bback").onclick = () => go("list");
+  document.getElementById("bmore").onclick = () => editEventDialog(ev);
+  $app.querySelectorAll("[data-tab]").forEach(b => b.onclick = () => { S.evTab = b.dataset.tab; renderEvent(); });
+  if (S.evTab === "count") drawCount(ev);
+  else if (S.evTab === "hours") drawHours(ev);
+  else drawItems(ev);
+}
+
+function drawCount(ev) {
+  const m = document.getElementById("evmain");
+  const arts = (ev.articles || []).filter(a => !a.hidden);
+  const today = dayKey(new Date());
+  const myUndo = S.undo.filter(u => u.evId === ev.id);
+  m.innerHTML = `
+    ${ev.date !== today ? `<div class="warn">Dieses Event ist am ${fmtDate(ev.date)}, nicht heute. Gezählt wird trotzdem in die aktuelle Stunde.</div>` : ""}
+    <div class="bar">
+      <span class="total">Total: <b>${evTotal(ev)}</b></span>
+      <button class="ghost" id="bundo" ${myUndo.length ? "" : "disabled"}>↶ Letzte rückgängig</button>
+    </div>
+    ${arts.length ? `<div class="grid">${arts.map(a => `<button class="btn" data-a="${esc(a.id)}">
+        <span class="n">${esc(a.name)}</span>
+        <span class="row"><span class="c">${artTotal(ev, a.id)}</span><span class="plus">＋</span></span></button>`).join("")}</div>`
+      : `<div class="empty">Keine Artikel.<br>Unter <b>Artikel</b> hinzufügen.</div>`}`;
+  m.querySelectorAll("[data-a]").forEach(b => b.onclick = () => tap(ev, b.dataset.a, b));
+  const u = document.getElementById("bundo");
+  if (u) u.onclick = () => undoLast(ev);
+}
+function tap(ev, artId, btn) {
+  const hk = hourKey(new Date().getHours());
+  // sofortige Anzeige (Firestore liefert gleich danach das lokale Update)
+  const c = btn.querySelector(".c"); if (c) c.textContent = (+c.textContent || 0) + 1;
+  btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 180);
+  try { navigator.vibrate && navigator.vibrate(15); } catch (_) {}
+  S.undo.push({ evId: ev.id, artId, hk }); if (S.undo.length > 100) S.undo.shift();
+  updateDoc(doc(db, "events", ev.id), new FieldPath("counts", artId, hk), increment(1)).catch(x => console.error(x));
+}
+function undoLast(ev) {
+  let i = -1; for (let j = S.undo.length - 1; j >= 0; j--) if (S.undo[j].evId === ev.id) { i = j; break; }
+  if (i < 0) return;
+  const u = S.undo.splice(i, 1)[0];
+  const live = curEvent() || ev;
+  const cur = ((live.counts || {})[u.artId] || {})[u.hk] || 0;
+  if (cur > 0) updateDoc(doc(db, "events", ev.id), new FieldPath("counts", u.artId, u.hk), increment(-1)).catch(x => console.error(x));
+  else render();
+}
+
+function drawHours(ev) {
+  const m = document.getElementById("evmain");
+  const counts = ev.counts || {};
+  const nameOf = id => ((ev.articles || []).find(a => a.id === id) || {}).name || "(unbekannt)";
+  const cols = (ev.articles || []).filter(a => !a.hidden || artTotal(ev, a.id) > 0).map(a => a.id);
+  Object.keys(counts).forEach(id => { if (!cols.includes(id) && artTotal(ev, id) > 0) cols.push(id); });
+  const hrs = new Set();
+  for (const id in counts) for (const k in counts[id]) if (counts[id][k] > 0) hrs.add(+k.slice(1));
+  if (!hrs.size) { m.innerHTML = `<div class="empty">Noch nichts gezählt.</div>`; return; }
+  const isToday = ev.date === dayKey(new Date());
+  const lo = Math.min(...hrs), hi = Math.min(23, isToday ? Math.max(new Date().getHours(), ...hrs) : Math.max(...hrs));
+  const hours = []; for (let x = lo; x <= hi; x++) hours.push(x);
+  const cell = (id, x) => (counts[id] || {})[hourKey(x)] || 0;
+  const per = x => cols.reduce((s, id) => s + cell(id, x), 0);
+  const max = Math.max(1, ...hours.map(per));
+  let all = 0;
+  m.innerHTML = `
+    <div class="chart">${hours.map(x => { const v = per(x); return `<div class="col"><span class="v">${v || ""}</span><div class="b" style="height:${v / max * 78}%"></div><span class="h">${pad2(x)}</span></div>`; }).join("")}</div>
+    <div class="scroll"><table>
+      <thead><tr><th>Stunde</th>${cols.map(id => `<th>${esc(nameOf(id))}</th>`).join("")}<th>Total</th></tr></thead>
+      <tbody>
+        ${hours.map(x => `<tr><td>${pad2(x)}–${pad2(x + 1)} Uhr</td>${cols.map(id => { const v = cell(id, x); return `<td class="${v ? "" : "z"}">${v}</td>`; }).join("")}<td><b>${per(x)}</b></td></tr>`).join("")}
+        <tr class="sum"><td>Total</td>${cols.map(id => { const s = artTotal(ev, id); all += s; return `<td>${s}</td>`; }).join("")}<td>${all}</td></tr>
+      </tbody></table></div>`;
+}
+
+function drawItems(ev) {
+  const m = document.getElementById("evmain");
+  const arts = ev.articles || [];
+  const vis = arts.filter(a => !a.hidden);
+  m.innerHTML = `
+    <div class="list">${vis.length ? vis.map((a, i) => `<div class="item">
+        <input type="text" value="${esc(a.name)}" data-id="${esc(a.id)}">
+        <button data-up="${esc(a.id)}" ${i ? "" : "disabled"} title="Nach oben">↑</button>
+        <button data-del="${esc(a.id)}" title="Löschen">✕</button></div>`).join("")
+      : `<div class="empty">Noch keine Artikel.</div>`}</div>
+    <form class="add" id="iadd"><input type="text" id="iaddn" placeholder="Neuer Artikel" autocomplete="off"><button class="primary">Hinzufügen</button></form>
+    <p class="note">Namen antippen zum Umbenennen. Ein gelöschter Artikel verschwindet von den Tasten; bereits gezählte Verkäufe bleiben in der Auswertung.</p>`;
+  const save = list => updateDoc(doc(db, "events", ev.id), { articles: list }).catch(x => console.error(x));
+  m.querySelectorAll("input[data-id]").forEach(inp => inp.onchange = () => {
+    const v = inp.value.trim(); if (!v) { inp.value = (arts.find(a => a.id === inp.dataset.id) || {}).name || ""; return; }
+    save(arts.map(a => a.id === inp.dataset.id ? { ...a, name: v } : a));
+  });
+  m.querySelectorAll("[data-up]").forEach(b => b.onclick = () => {
+    const list = arts.slice(); const vi = list.filter(a => !a.hidden);
+    const k = vi.findIndex(a => a.id === b.dataset.up); if (k < 1) return;
+    const i1 = list.indexOf(vi[k - 1]), i2 = list.indexOf(vi[k]);
+    [list[i1], list[i2]] = [list[i2], list[i1]]; save(list);
+  });
+  m.querySelectorAll("[data-del]").forEach(b => b.onclick = async () => {
+    const a = arts.find(x => x.id === b.dataset.del);
+    if (!(await confirmBox(`Artikel <b>${esc(a.name)}</b> löschen?`, "Löschen", true))) return;
+    const hasCounts = artTotal(ev, a.id) > 0;
+    save(hasCounts ? arts.map(x => x.id === a.id ? { ...x, hidden: true } : x) : arts.filter(x => x.id !== a.id));
+  });
+  document.getElementById("iadd").onsubmit = e => {
+    e.preventDefault();
+    const i = document.getElementById("iaddn"); const v = i.value.trim(); if (!v) return;
+    const ex = arts.find(a => nameKey(a.name) === nameKey(v));
+    if (ex && !ex.hidden) { i.value = ""; return; }
+    save(ex ? arts.map(a => a === ex ? { ...a, hidden: false } : a) : [...arts, { id: newId(), name: v }]);
+    i.value = "";
+    setTimeout(() => { const n = document.getElementById("iaddn"); n && n.focus(); }, 50);
+  };
+}
+
+function editEventDialog(ev) {
+  const m = modal(`<h3 style="margin:0 0 6px">Event bearbeiten</h3>
+    <label>Name</label><input type="text" id="ename" value="${esc(ev.name)}">
+    <label>Datum</label><input type="date" id="edate" value="${esc(ev.date)}">
+    <div class="acts" style="justify-content:space-between">
+      <button class="danger" id="edel">Löschen</button>
+      <span><button class="ghost" id="eno">Abbrechen</button> <button class="primary" id="eok">Speichern</button></span>
+    </div>`);
+  m.querySelector("#eno").onclick = () => m.remove();
+  m.querySelector("#eok").onclick = async () => {
+    const name = m.querySelector("#ename").value.trim(), date = m.querySelector("#edate").value;
+    if (!name || !date) return;
+    await updateDoc(doc(db, "events", ev.id), { name, nameKey: nameKey(name), date, year: +date.slice(0, 4) }).catch(x => console.error(x));
+    m.remove();
+  };
+  m.querySelector("#edel").onclick = async () => {
+    m.remove();
+    if (!(await confirmBox(`Event <b>${esc(ev.name)}</b> vom ${fmtDate(ev.date)} mit allen Zählungen endgültig löschen?`, "Endgültig löschen", true))) return;
+    await deleteDoc(doc(db, "events", ev.id)).catch(x => console.error(x));
+    go("list");
+  };
+}
+
+/* ---------------- PIN ---------------- */
+const PIN_LEN = 4, UNLOCK_MS = 10 * 60 * 1000;
+function openStats() {
+  if (Date.now() - S.statsUnlocked < UNLOCK_MS) return go("stats");
+  pinDialog(S.pinHash ? "PIN eingeben" : "Neuen PIN für die Statistik festlegen", async pin => {
+    const hsh = await sha256("vz-pin:" + pin);
+    if (!S.pinHash) {
+      const again = await new Promise(r => pinDialog("PIN wiederholen", p => r(p), () => r(null)));
+      if (again !== pin) { alertBox("Die PINs stimmen nicht überein."); return false; }
+      await setDoc(doc(db, "settings", "app"), { pinHash: hsh }, { merge: true });
+      S.pinHash = hsh;
+    } else if (hsh !== S.pinHash) return false;
+    S.statsUnlocked = Date.now(); go("stats"); return true;
+  });
+}
+function alertBox(t) { const m = modal(`<div>${esc(t)}</div><div class="acts"><button class="primary">OK</button></div>`); m.querySelector("button").onclick = () => m.remove(); }
+function pinDialog(title, onDone, onCancel) {
+  let v = "";
+  const m = modal(`<div style="text-align:center;font-weight:600">${esc(title)}</div>
+    <div class="pin">${"<span></span>".repeat(PIN_LEN)}</div>
+    <div class="err" style="text-align:center" id="perr"></div>
+    <div class="pad">${[1,2,3,4,5,6,7,8,9].map(n => `<button data-n="${n}">${n}</button>`).join("")}
+      <button data-x>✕</button><button data-n="0">0</button><button data-b>⌫</button></div>`);
+  const dots = () => m.querySelectorAll(".pin span").forEach((s, i) => s.classList.toggle("f", i < v.length));
+  m.querySelectorAll("[data-n]").forEach(b => b.onclick = async () => {
+    if (v.length >= PIN_LEN) return;
+    v += b.dataset.n; dots();
+    if (v.length === PIN_LEN) {
+      const pin = v; m.remove();
+      const ok = await onDone(pin);
+      if (ok === false && S.pinHash) { pinDialog(title, onDone, onCancel); setTimeout(() => { const e = document.getElementById("perr"); if (e) e.textContent = "Falscher PIN"; }, 0); }
+    }
+  });
+  m.querySelector("[data-b]").onclick = () => { v = v.slice(0, -1); dots(); };
+  m.querySelector("[data-x]").onclick = () => { m.remove(); onCancel && onCancel(); };
+}
+
+/* ---------------- Statistik: Jahresvergleich gleichnamiger Events ---------------- */
+function renderStats() {
+  if (Date.now() - S.statsUnlocked > UNLOCK_MS) return openStats();
+  const groups = new Map();
+  S.events.forEach(e => { if (!groups.has(e.nameKey)) groups.set(e.nameKey, []); groups.get(e.nameKey).push(e); });
+  const keys = [...groups.keys()].sort((a, b) => {
+    const la = groups.get(a)[0].date, lb = groups.get(b)[0].date; return lb.localeCompare(la);
+  });
+  if (!S.statsName || !groups.has(S.statsName)) S.statsName = keys[0] || null;
+  const label = k => groups.get(k)[0].name; // Events sind nach Datum absteigend sortiert → neuester Name
+  h(`<header><div class="top">
+      <button class="icon" id="bback">‹</button><h1>Statistik</h1>
+      <button class="icon" id="bpin" title="PIN ändern">🔑</button>
+    </div></header>
+    <main>
+      ${!keys.length ? `<div class="empty">Noch keine Events.</div>` : `
+      <label style="margin-top:0">Event</label>
+      <select id="sname">${keys.map(k => `<option value="${esc(k)}" ${k === S.statsName ? "selected" : ""}>${esc(label(k))} (${groups.get(k).length}×)</option>`).join("")}</select>
+      <div id="sout" style="margin-top:14px"></div>`}
+    </main>`);
+  document.getElementById("bback").onclick = () => go("list");
+  document.getElementById("bpin").onclick = changePin;
+  const sel = document.getElementById("sname");
+  if (sel) { sel.onchange = () => { S.statsName = sel.value; renderStats(); }; drawCompare(groups.get(S.statsName)); }
+}
+function drawCompare(evs) {
+  const out = document.getElementById("sout");
+  const byYear = new Map();
+  evs.forEach(e => { const y = +e.date.slice(0, 4); if (!byYear.has(y)) byYear.set(y, []); byYear.get(y).push(e); });
+  const years = [...byYear.keys()].sort((a, b) => a - b);
+  // Artikel jahresübergreifend über den Namen zusammenführen
+  const rows = new Map(); // nameKey -> {name, y:{year:n}}
+  for (const y of years) for (const e of byYear.get(y)) {
+    for (const a of (e.articles || [])) {
+      const t = artTotal(e, a.id); if (!t && a.hidden) continue;
+      const k = nameKey(a.name);
+      if (!rows.has(k)) rows.set(k, { name: a.name, y: {} });
+      const r = rows.get(k); r.y[y] = (r.y[y] || 0) + t;
+      if (y === years[years.length - 1]) r.name = a.name;
+    }
+  }
+  const list = [...rows.values()].sort((a, b) => (b.y[years[years.length - 1]] || 0) - (a.y[years[years.length - 1]] || 0) || a.name.localeCompare(b.name));
+  const tot = y => list.reduce((s, r) => s + (r.y[y] || 0), 0);
+  const last = years[years.length - 1], prev = years.length > 1 ? years[years.length - 2] : null;
+  const delta = (a, b) => {
+    if (prev === null) return "";
+    if (!b) return a ? `<span class="up">neu</span>` : "–";
+    const p = Math.round((a - b) / b * 100);
+    return `<span class="${p > 0 ? "up" : p < 0 ? "down" : ""}">${p > 0 ? "+" : ""}${p} %</span>`;
+  };
+  const head = y => {
+    const es = byYear.get(y);
+    return `<th>${y}<div style="font-weight:400;font-size:11px;color:var(--mut)">${es.map(e => fmtDate(e.date, { day: "2-digit", month: "2-digit" })).join(", ")}</div></th>`;
+  };
+  out.innerHTML = !list.length ? `<div class="empty">Keine Artikel erfasst.</div>` : `
+    <div class="scroll"><table>
+      <thead><tr><th>Artikel</th>${years.map(head).join("")}${prev !== null ? `<th>${prev}→${last}</th>` : ""}</tr></thead>
+      <tbody>
+        ${list.map(r => `<tr><td>${esc(r.name)}</td>${years.map(y => { const v = r.y[y]; return `<td class="${v ? "" : "z"}">${v ?? "–"}</td>`; }).join("")}${prev !== null ? `<td>${delta(r.y[last] || 0, r.y[prev] || 0)}</td>` : ""}</tr>`).join("")}
+        <tr class="sum"><td>Total</td>${years.map(y => `<td>${tot(y)}</td>`).join("")}${prev !== null ? `<td>${delta(tot(last), tot(prev))}</td>` : ""}</tr>
+      </tbody></table></div>
+    ${years.length < 2 ? `<p class="note">Bisher nur ein Jahr erfasst – der Vergleich erscheint, sobald dieses Event in einem weiteren Jahr gezählt wird.</p>` : ""}
+    <p class="note">Artikel werden über den Namen zusammengeführt (Gross-/Kleinschreibung egal). Gibt es ein Event mehrmals im selben Jahr, werden die Zahlen addiert.</p>`;
+}
+function changePin() {
+  pinDialog("Aktuellen PIN eingeben", async pin => {
+    if (await sha256("vz-pin:" + pin) !== S.pinHash) return false;
+    pinDialog("Neuen PIN eingeben", async p1 => {
+      pinDialog("Neuen PIN wiederholen", async p2 => {
+        if (p1 !== p2) { alertBox("Die PINs stimmen nicht überein."); return true; }
+        const hsh = await sha256("vz-pin:" + p1);
+        await setDoc(doc(db, "settings", "app"), { pinHash: hsh }, { merge: true });
+        S.pinHash = hsh; alertBox("PIN geändert."); return true;
+      });
+      return true;
+    });
+    return true;
+  });
+}
+
+/* ---------------- Service Worker ---------------- */
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+
+// Stundenansicht und Datumshervorhebung aktuell halten
+setInterval(() => { if (S.user && (S.view === "list" || (S.view === "event" && S.evTab === "hours"))) render(); }, 60000);
+</script>
+</body>
+</html>
