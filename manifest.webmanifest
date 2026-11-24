@@ -1,6 +1,6 @@
 {
-  "name": "Verkaufszähler",
-  "short_name": "Verkauf",
+  "name": "Schweizerhof Events",
+  "short_name": "Schweizerhof",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
