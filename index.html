@@ -32,13 +32,16 @@
   main{padding:14px;max-width:900px;margin:0 auto}
   .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px}
   .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-  .btn{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 12px;min-height:110px;display:flex;flex-direction:column;justify-content:space-between;text-align:left;cursor:pointer;user-select:none;transition:transform .06s,background .15s;font:inherit;color:inherit}
-  .btn:active{transform:scale(.97)}
+  .btn{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px;user-select:none;transition:background .15s}
   .btn.flash{background:var(--acc2)}
-  .btn .n{font-size:16px;font-weight:600;line-height:1.2;word-break:break-word}
-  .btn .row{display:flex;justify-content:space-between;align-items:flex-end}
-  .btn .c{font-size:30px;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums}
-  .btn .plus{font-size:26px;color:var(--mut)}
+  .btn .n{font-size:16px;font-weight:600;line-height:1.2;word-break:break-word;min-height:2.4em;text-align:center;display:flex;align-items:center;justify-content:center}
+  .btn .row{display:flex;align-items:center;gap:8px}
+  .btn .c{flex:1;text-align:center;font-size:30px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .pm{width:56px;height:56px;border:0;border-radius:12px;font:inherit;font-size:32px;font-weight:700;line-height:1;color:#fff;cursor:pointer;touch-action:manipulation;transition:transform .06s,opacity .15s;flex:none}
+  .pm:active{transform:scale(.92)}
+  .pm.minus{background:#c0392b}
+  .pm.plus{background:#2e8b3e}
+  .pm:disabled{opacity:.3;cursor:default}
   .bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap}
   .ghost{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:9px 12px;font:inherit;font-size:14px;cursor:pointer;color:var(--ink)}
   .ghost:disabled{opacity:.4;cursor:default}
@@ -201,7 +204,6 @@ const S = {
   view: "list",        // list | new | event | stats
   evId: null,
   evTab: "count",      // count | hours | items
-  undo: [],            // [{evId, artId, hk}]
   statsUnlocked: 0,    // Zeitstempel
   statsName: null,
   pinHash: null,
@@ -476,38 +478,44 @@ function drawCount(ev) {
   const m = document.getElementById("evmain");
   const arts = (ev.articles || []).filter(a => !a.hidden);
   const today = dayKey(new Date());
-  const myUndo = S.undo.filter(u => u.evId === ev.id);
   m.innerHTML = `
     ${ev.date !== today ? `<div class="warn">Dieses Event ist am ${fmtDate(ev.date)}, nicht heute. Gezählt wird trotzdem in die aktuelle Stunde.</div>` : ""}
     <div class="bar">
-      <span class="total">Total: <b>${evTotal(ev)}</b></span>
-      <button class="ghost" id="bundo" ${myUndo.length ? "" : "disabled"}>↶ Letzte rückgängig</button>
+      <span class="total">Total: <b id="evtot">${evTotal(ev)}</b></span>
     </div>
-    ${arts.length ? `<div class="grid">${arts.map(a => `<button class="btn" data-a="${esc(a.id)}">
+    ${arts.length ? `<div class="grid">${arts.map(a => { const n = artTotal(ev, a.id); return `<div class="btn" data-card="${esc(a.id)}">
         <span class="n">${esc(a.name)}</span>
-        <span class="row"><span class="c">${artTotal(ev, a.id)}</span><span class="plus">＋</span></span></button>`).join("")}</div>`
+        <span class="row">
+          <button class="pm minus" data-minus="${esc(a.id)}" ${n > 0 ? "" : "disabled"} aria-label="Minus">−</button>
+          <span class="c">${n}</span>
+          <button class="pm plus" data-plus="${esc(a.id)}" aria-label="Plus">+</button>
+        </span></div>`; }).join("")}</div>`
       : `<div class="empty">Keine Artikel.<br>Unter <b>Artikel</b> hinzufügen.</div>`}`;
-  m.querySelectorAll("[data-a]").forEach(b => b.onclick = () => tap(ev, b.dataset.a, b));
-  const u = document.getElementById("bundo");
-  if (u) u.onclick = () => undoLast(ev);
+  m.querySelectorAll("[data-plus]").forEach(b => b.onclick = () => change(ev, b.dataset.plus, +1));
+  m.querySelectorAll("[data-minus]").forEach(b => b.onclick = () => change(ev, b.dataset.minus, -1));
 }
-function tap(ev, artId, btn) {
-  const hk = hourKey(new Date().getHours());
-  // sofortige Anzeige (Firestore liefert gleich danach das lokale Update)
-  const c = btn.querySelector(".c"); if (c) c.textContent = (+c.textContent || 0) + 1;
-  btn.classList.add("flash"); setTimeout(() => btn.classList.remove("flash"), 180);
-  try { navigator.vibrate && navigator.vibrate(15); } catch (_) {}
-  S.undo.push({ evId: ev.id, artId, hk }); if (S.undo.length > 100) S.undo.shift();
-  updateDoc(doc(db, "events", ev.id), new FieldPath("counts", artId, hk), increment(1)).catch(x => console.error(x));
-}
-function undoLast(ev) {
-  let i = -1; for (let j = S.undo.length - 1; j >= 0; j--) if (S.undo[j].evId === ev.id) { i = j; break; }
-  if (i < 0) return;
-  const u = S.undo.splice(i, 1)[0];
+// Plus zählt in die aktuelle Stunde. Minus nimmt aus der aktuellen Stunde,
+// oder – falls dort nichts steht – aus der letzten Stunde mit Verkäufen.
+function change(ev, artId, dir) {
+  const cardC = document.querySelector(`[data-card="${artId}"] .c`);
+  if (dir < 0 && cardC && +cardC.textContent <= 0) return;
   const live = curEvent() || ev;
-  const cur = ((live.counts || {})[u.artId] || {})[u.hk] || 0;
-  if (cur > 0) updateDoc(doc(db, "events", ev.id), new FieldPath("counts", u.artId, u.hk), increment(-1)).catch(x => console.error(x));
-  else render();
+  const hrs = (live.counts || {})[artId] || {};
+  let hk = hourKey(new Date().getHours());
+  if (dir < 0 && !(hrs[hk] > 0)) {
+    hk = Object.keys(hrs).filter(k => /^h\d\d$/.test(k) && hrs[k] > 0).sort().pop();
+    if (!hk) return;
+  }
+  // sofortige Anzeige (Firestore liefert gleich danach das lokale Update)
+  const card = document.querySelector(`[data-card="${artId}"]`);
+  if (card) {
+    const c = card.querySelector(".c"), v = Math.max(0, (+c.textContent || 0) + dir);
+    c.textContent = v; card.querySelector(".minus").disabled = v <= 0;
+    const t = document.getElementById("evtot"); if (t) t.textContent = Math.max(0, (+t.textContent || 0) + dir);
+    card.classList.add("flash"); setTimeout(() => card.classList.remove("flash"), 180);
+  }
+  try { navigator.vibrate && navigator.vibrate(dir > 0 ? 15 : [10, 40, 10]); } catch (_) {}
+  updateDoc(doc(db, "events", ev.id), new FieldPath("counts", artId, hk), increment(dir)).catch(x => console.error(x));
 }
 
 function drawSum(ev) {
