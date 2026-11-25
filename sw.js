@@ -1,6 +1,6 @@
 // Schweizerhof Events – Service Worker
 // Bei Änderungen an der App die Versionsnummer erhöhen.
-const CACHE = "se-v6";
+const CACHE = "se-v7";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png"];
 const SDK = "https://www.gstatic.com/firebasejs/";
 
